@@ -1,125 +1,163 @@
+import 'dart:convert';
+import 'package:encrypt/encrypt.dart' as enc;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(LockBoxApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  // This widget is the root of your application.
+class LockBoxApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      title: 'LockBox',
+      theme: ThemeData(primarySwatch: Colors.blue),
+      home: LockBoxScreen(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
-
+class LockBoxScreen extends StatefulWidget {
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  _LockBoxScreenState createState() => _LockBoxScreenState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class _LockBoxScreenState extends State<LockBoxScreen> {
+  final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _dataController = TextEditingController();
+  String? _encryptedData;
+  String? _decryptedData;
 
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
+  String encrypt(String data, String key) {
+    final encrypter = enc.Encrypter(enc.AES(enc.Key.fromUtf8(key), mode: enc.AESMode.cbc));
+    final iv = enc.IV.fromLength(16);
+    final encrypted = encrypter.encrypt(data, iv: iv);
+    return base64Encode(iv.bytes + encrypted.bytes); // 合并 iv 和密文
+  }
+
+  String decrypt(String encryptedBase64, String key) {
+    final encryptedBytes = base64Decode(encryptedBase64);
+    final iv = enc.IV(encryptedBytes.sublist(0, 16));
+    final encryptedData = encryptedBytes.sublist(16);
+    final encrypter = enc.Encrypter(enc.AES(enc.Key.fromUtf8(key), mode: enc.AESMode.cbc));
+    return encrypter.decrypt(enc.Encrypted(encryptedData), iv: iv);
+  }
+
+  void handleEncrypt() {
+    final data = _dataController.text;
+    final password = _passwordController.text;
+    if (data.isNotEmpty && password.isNotEmpty) {
+      final key = password.padRight(32, '*').substring(0, 32); // 确保32字节密钥
+      final encryptedData = encrypt(data, key);
+      setState(() {
+        _encryptedData = encryptedData;
+        _decryptedData = null; // 重置解密结果
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('数据已成功加密！请妥善保存加密结果和密码。')),
+      );
+    }
+  }
+
+  void handleDecrypt() {
+    final encryptedJson = _encryptedData;
+    final password = _passwordController.text;
+    if (encryptedJson != null && password.isNotEmpty) {
+      try {
+        final key = password.padRight(32, '*').substring(0, 32);
+        final decryptedData = decrypt(encryptedJson, key);
+        setState(() {
+          _decryptedData = decryptedData;
+          _encryptedData = null; // 解密时清空加密数据（如果需要）
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('数据已成功解密！请核对解密内容是否正确。')),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('解密失败！请检查输入的密码是否正确，并确保数据未被篡改。')),
+        );
+      }
+    }
+  }
+
+  void copyToClipboard(String text) {
+    Clipboard.setData(ClipboardData(text: text)).then((value) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('已成功复制到剪贴板！请放心使用。')),
+      );
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
-      appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
+      appBar: AppBar(title: Text('LockBox')),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: _passwordController,
+                decoration: InputDecoration(
+                  labelText: '请输入密码',
+                  border: OutlineInputBorder(),
+                ),
+                obscureText: true,
+              ),
+              SizedBox(height: 16.0),
+              Container(
+                constraints: BoxConstraints(maxHeight: 200.0),
+                child: TextField(
+                  controller: _dataController,
+                  maxLines: null,
+                  keyboardType: TextInputType.multiline,
+                  decoration: InputDecoration(
+                    labelText: '请输入数据',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ),
+              SizedBox(height: 16.0),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  ElevatedButton(onPressed: handleEncrypt, child: Text('加密')),
+                  ElevatedButton(onPressed: handleDecrypt, child: Text('解密')),
+                ],
+              ),
+              if (_encryptedData != null || _decryptedData != null) ...[
+                SizedBox(height: 16.0),
+                Text(
+                  _encryptedData != null ? '加密结果:' : '解密结果:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                Container(
+                  height: 150.0,
+                  padding: EdgeInsets.all(8.0),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey),
+                    borderRadius: BorderRadius.circular(4.0),
+                  ),
+                  child: SingleChildScrollView(
+                    child: SelectableText(
+                      _encryptedData ?? _decryptedData!,
+                      style: TextStyle(fontFamily: 'monospace'),
+                    ),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () => copyToClipboard(_encryptedData ?? _decryptedData!),
+                  child: Text('复制结果'),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
     );
   }
 }
