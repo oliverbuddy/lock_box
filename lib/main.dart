@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:encrypt/encrypt.dart' as enc;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 
 void main() {
   runApp(LockBoxApp());
@@ -33,7 +34,7 @@ class _LockBoxScreenState extends State<LockBoxScreen> {
     final encrypter = enc.Encrypter(enc.AES(enc.Key.fromUtf8(key), mode: enc.AESMode.cbc));
     final iv = enc.IV.fromLength(16);
     final encrypted = encrypter.encrypt(data, iv: iv);
-    return base64Encode(iv.bytes + encrypted.bytes); // 合并 iv 和密文
+    return base64Encode(iv.bytes + encrypted.bytes);
   }
 
   String decrypt(String encryptedBase64, String key) {
@@ -48,15 +49,13 @@ class _LockBoxScreenState extends State<LockBoxScreen> {
     final data = _dataController.text;
     final password = _passwordController.text;
     if (data.isNotEmpty && password.isNotEmpty) {
-      final key = password.padRight(32, '*').substring(0, 32); // 确保32字节密钥
+      final key = password.padRight(32, '*').substring(0, 32);
       final encryptedData = encrypt(data, key);
       setState(() {
         _encryptedData = encryptedData;
-        _decryptedData = null; // 重置解密结果
+        _decryptedData = null;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('数据已成功加密！请妥善保存加密结果和密码。')),
-      );
+      showMessage('数据已成功加密！请妥善保存加密结果和密码。', Colors.green);
     }
   }
 
@@ -69,25 +68,30 @@ class _LockBoxScreenState extends State<LockBoxScreen> {
         final decryptedData = decrypt(encryptedJson, key);
         setState(() {
           _decryptedData = decryptedData;
-          _encryptedData = null; // 解密时清空加密数据（如果需要）
+          _encryptedData = null;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('数据已成功解密！请核对解密内容是否正确。')),
-        );
+        showMessage('数据已成功解密！请核对解密内容是否正确。', Colors.green);
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('解密失败！请检查输入的密码是否正确，并确保数据未被篡改。')),
-        );
+        showMessage('解密失败！请检查输入的密码是否正确，并确保数据未被篡改。', Colors.red);
       }
     }
   }
 
   void copyToClipboard(String text) {
     Clipboard.setData(ClipboardData(text: text)).then((value) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已成功复制到剪贴板！请放心使用。')),
-      );
+      showMessage('已成功复制到剪贴板！请放心使用。', Colors.blue);
     });
+  }
+
+  void showMessage(String message, Color color) {
+    Fluttertoast.showToast(
+      msg: message,
+      toastLength: Toast.LENGTH_SHORT,
+      gravity: ToastGravity.CENTER, // 提示信息居中显示
+      backgroundColor: color,
+      textColor: Colors.white,
+      fontSize: 16.0,
+    );
   }
 
   @override
@@ -100,30 +104,48 @@ class _LockBoxScreenState extends State<LockBoxScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Container(
+                padding: const EdgeInsets.all(8.0),
+                decoration: BoxDecoration(
+                  color: Colors.red[100],
+                  borderRadius: BorderRadius.circular(8.0),
+                ),
+                child: Text(
+                  '温馨提示：所有数据均在本地加密，不会存储到任何地方，请妥善保存密码和加密结果！',
+                  style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              SizedBox(height: 16.0),
               TextField(
                 controller: _passwordController,
                 decoration: InputDecoration(
                   labelText: '请输入密码',
                   border: OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    icon: Icon(Icons.clear),
+                    onPressed: () => _passwordController.clear(),
+                  ),
                 ),
                 obscureText: true,
               ),
               SizedBox(height: 16.0),
-              Container(
-                constraints: BoxConstraints(maxHeight: 200.0),
-                child: TextField(
-                  controller: _dataController,
-                  maxLines: null,
-                  keyboardType: TextInputType.multiline,
-                  decoration: InputDecoration(
-                    labelText: '请输入数据',
-                    border: OutlineInputBorder(),
+              TextField(
+                controller: _dataController,
+                maxLines: null,
+                keyboardType: TextInputType.multiline,
+                decoration: InputDecoration(
+                  labelText: '请输入数据',
+                  border: OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    icon: Icon(Icons.clear),
+                    onPressed: () => _dataController.clear(),
                   ),
                 ),
               ),
               SizedBox(height: 16.0),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   ElevatedButton(onPressed: handleEncrypt, child: Text('加密')),
                   ElevatedButton(onPressed: handleDecrypt, child: Text('解密')),
@@ -136,7 +158,7 @@ class _LockBoxScreenState extends State<LockBoxScreen> {
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 Container(
-                  height: 150.0,
+                  constraints: BoxConstraints(minWidth: double.infinity, minHeight: 50),
                   padding: EdgeInsets.all(8.0),
                   decoration: BoxDecoration(
                     border: Border.all(color: Colors.grey),
@@ -149,9 +171,13 @@ class _LockBoxScreenState extends State<LockBoxScreen> {
                     ),
                   ),
                 ),
-                ElevatedButton(
-                  onPressed: () => copyToClipboard(_encryptedData ?? _decryptedData!),
-                  child: Text('复制结果'),
+                SizedBox(height: 8.0),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: ElevatedButton(
+                    onPressed: () => copyToClipboard(_encryptedData ?? _decryptedData!),
+                    child: Text('复制结果'),
+                  ),
                 ),
               ],
             ],
