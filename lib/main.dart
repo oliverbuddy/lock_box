@@ -130,7 +130,10 @@ class _LockBoxScreenState extends State<LockBoxScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('LockBox')),
+      appBar: AppBar(
+        title: Text('LockBox'),
+        centerTitle: true,
+      ),
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
