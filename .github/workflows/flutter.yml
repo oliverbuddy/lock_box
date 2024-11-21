@@ -2,8 +2,10 @@ name: Flutter Build
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - '*' # 监听所有标签
+#    branches:
+#      - main
 
 jobs:
   build:
@@ -31,11 +33,26 @@ jobs:
         run: flutter build apk --release
 
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v3
+          # 创建 Release 并上传 APK
+      - name: 上传 APK 到 Release
+        uses: ncipollo/release-action@v1
         with:
-          name: app-apk
-          path: android/app/build/outputs/apk/**/*.apk
+         token: ${{ secrets.GITHUB_TOKEN }}
+         tag: ${{ github.ref_name }}
+         release_name: Release ${{ github.ref_name }}
+         draft: false
+         prerelease: false
+         files: build/app/outputs/flutter-apk/app-release.apk
+
+
+
+#      - name: Upload APK
+#        uses: actions/upload-artifact@v3
+#        with:
+#          name: app-apk
+#          path: android/app/build/outputs/apk/**/*.apk
+
+
 #      - name: Upload APK to GitHub Releases
 #        uses: softprops/action-gh-release@v1
 #        with:
