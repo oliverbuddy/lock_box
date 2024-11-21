@@ -3,6 +3,7 @@ import 'package:encrypt/encrypt.dart' as enc;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 void main() {
   runApp(LockBoxApp());
@@ -14,6 +15,15 @@ class LockBoxApp extends StatelessWidget {
     return MaterialApp(
       title: 'LockBox',
       theme: ThemeData(primarySwatch: Colors.blue),
+      locale: Locale('zh'),
+      supportedLocales: [
+        Locale('en'),
+        Locale('zh'),
+      ],
+      localizationsDelegates: [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ],
       home: LockBoxScreen(),
     );
   }
@@ -48,49 +58,72 @@ class _LockBoxScreenState extends State<LockBoxScreen> {
   void handleEncrypt() {
     final data = _dataController.text;
     final password = _passwordController.text;
-    if (data.isNotEmpty && password.isNotEmpty) {
-      final key = password.padRight(32, '*').substring(0, 32);
-      final encryptedData = encrypt(data, key);
-      setState(() {
-        _encryptedData = encryptedData;
-        _decryptedData = null;
-      });
-      showMessage('数据已成功加密！请妥善保存加密结果和密码。', Colors.green);
+
+    if (data.isEmpty || password.isEmpty) {
+      _showToast(context, '请输入有效的数据和密码！', Colors.red);
+      return;
     }
+
+    final key = password.padRight(32, '*').substring(0, 32);
+    final encryptedData = encrypt(data, key);
+    setState(() {
+      _encryptedData = encryptedData;
+      _decryptedData = null;
+    });
+    _showToast(context, '数据已成功加密！请妥善保存加密结果和密码。', Colors.green);
   }
 
   void handleDecrypt() {
     final encryptedJson = _encryptedData;
     final password = _passwordController.text;
-    if (encryptedJson != null && password.isNotEmpty) {
-      try {
-        final key = password.padRight(32, '*').substring(0, 32);
-        final decryptedData = decrypt(encryptedJson, key);
-        setState(() {
-          _decryptedData = decryptedData;
-          _encryptedData = null;
-        });
-        showMessage('数据已成功解密！请核对解密内容是否正确。', Colors.green);
-      } catch (e) {
-        showMessage('解密失败！请检查输入的密码是否正确，并确保数据未被篡改。', Colors.red);
-      }
+
+    if (encryptedJson == null || password.isEmpty) {
+      _showToast(context, '解密失败！请输入有效的数据和密码。', Colors.red);
+      return;
+    }
+
+    try {
+      final key = password.padRight(32, '*').substring(0, 32);
+      final decryptedData = decrypt(encryptedJson, key);
+      setState(() {
+        _decryptedData = decryptedData;
+        _encryptedData = null;
+      });
+      _showToast(context, '数据已成功解密！请核对内容是否正确。', Colors.green);
+    } catch (e) {
+      _showToast(context, '解密失败！请检查密码或数据。', Colors.red);
     }
   }
 
   void copyToClipboard(String text) {
     Clipboard.setData(ClipboardData(text: text)).then((value) {
-      showMessage('已成功复制到剪贴板！请放心使用。', Colors.blue);
+      _showToast(context, '已复制到剪贴板！', Colors.blue);
     });
   }
 
-  void showMessage(String message, Color color) {
-    Fluttertoast.showToast(
-      msg: message,
-      toastLength: Toast.LENGTH_SHORT,
-      gravity: ToastGravity.CENTER, // 提示信息居中显示
-      backgroundColor: color,
-      textColor: Colors.white,
-      fontSize: 16.0,
+  void _showToast(BuildContext context, String message, Color bgColor) {
+    FToast fToast = FToast();
+    fToast.init(context);
+
+    final deviceWidth = MediaQuery.of(context).size.width;
+
+    fToast.showToast(
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+        margin: EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
+        constraints: BoxConstraints(maxWidth: deviceWidth * 0.9),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(8.0),
+        ),
+        child: Text(
+          message,
+          style: TextStyle(color: Colors.white, fontSize: deviceWidth * 0.04),
+          textAlign: TextAlign.center,
+        ),
+      ),
+      gravity: ToastGravity.TOP,
+      toastDuration: Duration(seconds: 3),
     );
   }
 
@@ -122,12 +155,15 @@ class _LockBoxScreenState extends State<LockBoxScreen> {
                 decoration: InputDecoration(
                   labelText: '请输入密码',
                   border: OutlineInputBorder(),
-                  suffixIcon: IconButton(
-                    icon: Icon(Icons.clear),
-                    onPressed: () => _passwordController.clear(),
-                  ),
+                  suffixIcon: _passwordController.text.isNotEmpty
+                      ? IconButton(
+                          icon: Icon(Icons.clear),
+                          onPressed: () => setState(() => _passwordController.clear()),
+                        )
+                      : null,
                 ),
                 obscureText: true,
+                onChanged: (_) => setState(() {}),
               ),
               SizedBox(height: 16.0),
               TextField(
@@ -137,11 +173,14 @@ class _LockBoxScreenState extends State<LockBoxScreen> {
                 decoration: InputDecoration(
                   labelText: '请输入数据',
                   border: OutlineInputBorder(),
-                  suffixIcon: IconButton(
-                    icon: Icon(Icons.clear),
-                    onPressed: () => _dataController.clear(),
-                  ),
+                  suffixIcon: _dataController.text.isNotEmpty
+                      ? IconButton(
+                          icon: Icon(Icons.clear),
+                          onPressed: () => setState(() => _dataController.clear()),
+                        )
+                      : null,
                 ),
+                onChanged: (_) => setState(() {}),
               ),
               SizedBox(height: 16.0),
               Row(
