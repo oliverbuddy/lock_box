@@ -37,12 +37,12 @@ jobs:
       - name: 上传 APK 到 Release
         uses: ncipollo/release-action@v1
         with:
-         token: ${{ secrets.GITHUB_TOKEN }}
-         tag: ${{ github.ref_name }}
-         release_name: Release ${{ github.ref_name }}
-         draft: false
-         prerelease: false
-         files: build/app/outputs/flutter-apk/app-release.apk
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          artifacts: build/app/outputs/flutter-apk/app-release.apk
+          draft: false
+          prerelease: false
 
 
 
