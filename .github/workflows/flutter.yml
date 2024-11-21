@@ -30,6 +30,12 @@ jobs:
       - name: Build APK for Android
         run: flutter build apk --release
 
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v3
+        with:
+          name: app-apk
+          path: android/app/build/outputs/apk/**/*.apk
 #      - name: Upload APK to GitHub Releases
 #        uses: softprops/action-gh-release@v1
 #        with:
